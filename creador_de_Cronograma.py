@@ -204,9 +204,20 @@ df = pd.DataFrame(cronograma)
 # --- 4. RENDERIZADO VISUAL EN LA WEB ---
 st.write(f"### Cotización a Inversionista: {inversionista}")
 col1, col2, col3 = st.columns(3)
-col1.metric("Fecha de Emisión", fecha_a_espanol(fecha_emision))
-col2.metric("Fecha de Redención", fecha_a_espanol(fecha_redencion))
-col3.metric("Plazo Exacto", f"{plazo_total_dias} días")
+
+# Función de apoyo rápida para dar formato a la métrica pequeña
+def metrica_pequena(titulo, valor):
+    return f"""
+    <div style='line-height: 1.3; margin-bottom: 15px;'>
+        <span style='font-size: 14px; color: #666;'>{titulo}</span><br>
+        <span style='font-size: 20px; font-weight: 600;'>{valor}</span>
+    </div>
+    """
+
+# Insertamos el texto usando markdown y permitiendo HTML
+col1.markdown(metrica_pequena("Fecha de Emisión", fecha_a_espanol(fecha_emision)), unsafe_allow_html=True)
+col2.markdown(metrica_pequena("Fecha de Redención", fecha_a_espanol(fecha_redencion)), unsafe_allow_html=True)
+col3.markdown(metrica_pequena("Plazo Exacto", f"{plazo_total_dias} días"), unsafe_allow_html=True)
 
 # Copiamos para no dañar los números del Excel que generaremos luego
 df_mostrar = df.copy()
