@@ -7,6 +7,10 @@ import copy
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Side, Border
 from openpyxl.drawing.image import Image as OpenpyxlImage # NUEVO: Para insertar el logo
+import os
+import tempfile
+import subprocess
+import sys
 
 # Configuración inicial de la página web
 st.set_page_config(page_title="Emisión de Bonos Sostenibles", layout="wide", page_icon="🌳")
@@ -92,16 +96,24 @@ with st.sidebar:
     else:
         # Si no hay restricción, dejamos elegir libremente
         moneda = st.selectbox("I9: Moneda", ["USD", "PEN"])
+
+
+
         
         # Alerta especial solo para Papeles Comerciales
         if programa == "1° Emisión de Papeles Comerciales (USD-PEN)":
             st.warning("⚠️ ATENCIÓN: Verifique que la moneda sea la correcta para esta emisión de Papeles Comerciales.")
     
+    
+
+
     monto = st.number_input("I10: Monto a invertir", min_value=1000.0, value=130000.0, step=1000.0)
     
     tipo_tasa = st.selectbox("I11: Tipo de Tasa", ["Anual", "Mensual", "A Vencimiento"])
     tasa_input = st.number_input("Tasa Nominal (%)", value=10.25, step=0.01, format="%.2f") / 100
     
+    escoger_pdf = st.selectbox("Generar en Formato PDF", ["NO", "SÍ"], index=0)
+
     fecha_emision = st.date_input("I12: Fecha de Inversión (Emisión)", datetime(2026, 5, 11))
     frecuencia = st.selectbox("I13: Frecuencia del cupón", ["Trimestral", "Mensual"])
     
@@ -209,16 +221,15 @@ col1, col2, col3 = st.columns(3)
 def metrica_pequena(titulo, valor):
     return f"""
     <div style='line-height: 1.3; margin-bottom: 15px;'>
-        <span style='font-size: 14px; color: #666;'>{titulo}</span><br>
-        <span style='font-size: 20px; font-weight: 600;'>{valor}</span>
+        <span style='font-size: 12px; color: #666;'>{titulo}</span><br>
+        <span style='font-size: 16px; font-weight: 600;'>{valor}</span>
     </div>
     """
 
 # Insertamos el texto usando markdown y permitiendo HTML
 col1.markdown(metrica_pequena("Fecha de Emisión", fecha_a_espanol(fecha_emision)), unsafe_allow_html=True)
 col2.markdown(metrica_pequena("Fecha de Redención", fecha_a_espanol(fecha_redencion)), unsafe_allow_html=True)
-col3.markdown(metrica_pequena("Plazo Exacto", f"{plazo_total_dias} días"), unsafe_allow_html=True)
-
+col3.markdown(metrica_pequena("Plazo Exacto", f"{plazo_total_dias} días"), unsafe_allow_html=True)  
 # Copiamos para no dañar los números del Excel que generaremos luego
 df_mostrar = df.copy()
 
@@ -278,9 +289,7 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
         st.warning("⚠️ No se encontró el archivo de imagen 'logo_bam.png' en la carpeta del script. El cronograma se generará sin el logo en la cabecera.")
     # 🖼️ Fin de código del logo
 
-    # Textos de características que luego se pintarán
-    ws["C6"] = "CARACTERISTICAS DE LA INVERSION"
-    etiquetas = "Nombre Inversionista", "Plazo", "Moneda", "Monto a invertir", 
+
 
     
     # Textos que luego se pintarán
@@ -301,8 +310,8 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
     ws["I19"] = monto
     ws["I19"].number_format = '#,##0.00'
     ws["I10"].number_format = '#,##0.00'
-    ws["I11"].number_format = '0.00%'
-    ws["I14"].number_format = '0.00%'
+    ws["I11"].number_format = '0.00##%'
+    ws["I14"].number_format = '0.00%'       
     
     # Llenado de Cabeceras (C21 a I21)
     headers = list(df.columns)
@@ -331,9 +340,11 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
                     cell.value = int(value)
                     cell.number_format = '0'
                 cell.alignment = Alignment(horizontal="center")
-            elif c_idx in [5, 6, 7]: # Finanzas
+            elif c_idx in [5, 6, 7]: # Finanzas (Cupón, Retención IR, Neto a pagar)
                 if pd.notnull(value):
-                    cell.value = value
+                    # Redondeamos el valor matemáticamente a 2 decimales antes de pasarlo a Excel
+                    cell.value = round(float(value), 2)
+                    # Forzamos a Excel a mostrar siempre 2 decimales y comas de miles
                     cell.number_format = '#,##0.00'
                 cell.alignment = Alignment(horizontal="right")
             else: # Resto
@@ -425,24 +436,118 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
                 nueva_fuente.name = fuente_global
                 cell.font = nueva_fuente # Guardamos los cambios
 
+
+    # === AJUSTES DE IMPRESIÓN PARA PDF PERFECTO ===
+    ws.print_options.horizontalCentered = True
+    ws.print_area = f'B2:J{fila_actual}' # Define el área exacta a capturar
+    ws.page_setup.fitToWidth = 1 # Fuerza a que el ancho quepa en 1 página
+    ws.page_setup.fitToHeight = 0 # Deja que la altura fluya
+    # ==============================================
+
+
     # Guardar en memoria y retornar
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
     return output
 
+# --- 6. EXPORTACIÓN A PDF (VIA EXCEL NATIVO) ---
+def generar_pdf_desde_excel(excel_bytes):
+    temp_dir = tempfile.gettempdir()
+    # Generamos nombres de archivo únicos para evitar cruces si varios usuarios lo usan a la vez
+    temp_excel_path = os.path.join(temp_dir, "temp_crono_nube.xlsx")
+    temp_pdf_path = os.path.join(temp_dir, "temp_crono_nube.pdf")
+    
+    # 1. Guardar el archivo de Excel crudo
+    with open(temp_excel_path, "wb") as f:
+        f.write(excel_bytes.getvalue())
+        
+    try:
+        # Detectar automáticamente si estamos en Windows (Local) o Linux (Nube)
+        if sys.platform == "win32":
+            # Ruta de LibreOffice en tu laptop
+            ejecutable = r"C:\Program Files\LibreOffice\program\soffice.exe"
+        else:
+            # Comando estándar en la nube (Streamlit Cloud)
+            ejecutable = "libreoffice"
 
+        # Comando unificado
+        comando = [
+            ejecutable, '--headless', '--convert-to', 'pdf',
+            '--outdir', temp_dir, temp_excel_path
+        ]
+        
+        # Ejecutamos el comando y esperamos a que termine
+        subprocess.run(comando, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+    except Exception as e:
+        st.error(f"Error al generar PDF en la nube: {e}")
+        return None
+            
+    # 3. Leer el PDF generado
+    pdf_output = io.BytesIO()
+    if os.path.exists(temp_pdf_path):
+        with open(temp_pdf_path, "rb") as f:
+            pdf_output.write(f.read())
+        pdf_output.seek(0)
+        
+    # 4. Limpiar los archivos temporales del servidor
+    try:
+        if os.path.exists(temp_excel_path): os.remove(temp_excel_path)
+        if os.path.exists(temp_pdf_path): os.remove(temp_pdf_path)
+    except:
+        pass 
+        
+    return pdf_output
+
+
+
+
+# --- 7. CONTROL DE DESCARGAS ---
 st.write("---")
-st.write("### 💾 Descargar Archivo")
+st.header("💾 Descargar Archivos")
+
+nombre_archivo_limpio = complemento_archivo.replace(' ', '_').replace('/', '-')
+nombre_archivo_excel = f"CRONO-{codigo_serie}-O-{nombre_archivo_limpio}.xlsx"
+nombre_archivo_pdf = f"CRONO-{codigo_serie}-O-{nombre_archivo_limpio}.pdf"
+
+# 1. Generamos el Excel base (siempre se necesita, ya sea para descargar o como molde del PDF)
 excel_file = generar_excel_bam(df, inversionista, plazo_total_dias, moneda, monto, tna, fecha_emision, fecha_redencion, frecuencia, tasa_ir)
 
-# NUEVO: Ensamblaje con la estructura exacta: CRONO - SERIE - O - COMPLEMENTO
-nombre_archivo_limpio = complemento_archivo.replace(' ', '_').replace('/', '-')
-nombre_archivo = f"CRONO-{codigo_serie}-O-{nombre_archivo_limpio}.xlsx"
+col_btn1, col_btn2 = st.columns(2)
 
-st.download_button(
-    label="📥 Descargar Cronograma Oficial (Excel)",
-    data=excel_file,
-    file_name=nombre_archivo,
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+with col_btn1:
+    st.download_button(
+        label="📥 Descargar Cronograma (Excel)",
+        data=excel_file,
+        file_name=nombre_archivo_excel,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True 
+    )
+
+with col_btn2:
+    if escoger_pdf == "SÍ":
+        # NUEVA LÓGICA: Le pasamos el Excel ya diseñado al generador de PDF
+        with st.spinner('Ensamblando PDF corporativo...'):
+            pdf_file = generar_pdf_desde_excel(excel_file)
+            
+        if pdf_file:
+            st.download_button(
+                label="📥 Descargar Cronograma (PDF)",
+                data=pdf_file,
+                file_name=nombre_archivo_pdf,
+                mime="application/pdf",
+                disabled=False,
+                use_container_width=True
+            )
+        else:
+            st.error("No se pudo compilar el PDF localmente.")
+    else:
+        st.download_button(
+            label="🚫 Generación de PDF Desactivada",
+            data=b"", 
+            file_name="vacio.pdf",
+            disabled=True,
+            help="Selecciona 'SÍ' en la barra lateral (Creación de PDF) para habilitar esta descarga.",
+            use_container_width=True
+        )
