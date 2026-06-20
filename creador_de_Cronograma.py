@@ -437,11 +437,20 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
                 cell.font = nueva_fuente # Guardamos los cambios
 
 
-    # === AJUSTES DE IMPRESIÓN PARA PDF PERFECTO ===
+# === AJUSTES DE IMPRESIÓN PARA PDF PERFECTO ===
     ws.print_options.horizontalCentered = True
-    ws.print_area = f'B2:J{fila_actual}' # Define el área exacta a capturar
-    ws.page_setup.fitToWidth = 1 # Fuerza a que el ancho quepa en 1 página
-    ws.page_setup.fitToHeight = 0 # Deja que la altura fluya
+    ws.print_area = f'B2:J{fila_actual}' 
+    
+    # Asegurar que escale a 1 página de ancho
+    ws.page_setup.fitToWidth = 1 
+    ws.page_setup.fitToHeight = 0 
+    
+    # NUEVA MODIFICACIÓN QUIRÚRGICA: Reducir márgenes y fijar papel A4
+    ws.page_margins.left = 0.25
+    ws.page_margins.right = 0.25
+    ws.page_margins.top = 0.5
+    ws.page_margins.bottom = 0.5
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
     # ==============================================
 
 
