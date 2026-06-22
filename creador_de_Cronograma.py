@@ -84,6 +84,11 @@ with st.sidebar:
     inversionista = st.text_input("I7: Nombre Inversionista", "Federico Oviedo / Maria de la Cruz")
 
     Letra_serie = st.text_input("I7: Letra de la Serie", "Letra de la serie")
+
+    # === NUEVOS INPUTS DE DOCUMENTO ===
+    tipo_documento = st.selectbox("Tipo de documento", ["DNI", "RUC", "CE", "Pasaporte"], index=1)
+    numero_documento = st.text_input("Número de documento", "")
+    # ==================================
     
     tipo_plazo = st.radio("Definición de Plazo", ["Días Exactos", "Años Exactos"])
     if tipo_plazo == "Días Exactos":
@@ -251,110 +256,99 @@ st.success(f"**MONTO A RECIBIR: {moneda} {total_neto:,.2f}**")
 # --- 5. EXPORTACIÓN A EXCEL (PLANTILLA CORPORATIVA ENMARCADA) ---
 
 
-def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, ir):
+# --- 5. EXPORTACIÓN A EXCEL (PLANTILLA CORPORATIVA ENMARCADA) ---
+def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, ir, titulo_crono, tipo_doc, num_doc):
     wb = Workbook()
     ws = wb.active
     ws.title = "Cronograma"
-    # NUEVO: Apaga la cuadrícula de fondo de Excel
     ws.sheet_view.showGridLines = False
+    
     # 🎨 Paleta de colores y estilos corporativos
     ft_bold = Font(bold=True)
-    ft_white_bold = Font(bold=True, color="FFFFFF") # Letra blanca
-    ft_purple_bold = Font(bold=True, color="51154A") # NUEVO: Tu color morado
-    fill_dark_green = PatternFill(start_color="196B24", end_color="196B24", fill_type="solid") # Verde #196B24
+    ft_white_bold = Font(bold=True, color="FFFFFF") 
+    ft_purple_bold = Font(bold=True, color="51154A") 
+    fill_dark_green = PatternFill(start_color="196B24", end_color="196B24", fill_type="solid") 
     ft_title = Font(bold=True, size=14) 
 
-    # Títulos base
+    # Títulos base dinámicos
     ws["F3"] = "BOSQUES AMAZÓNICOS S.A."
-    ws["F4"] = "CRONOGRAMA"
-    ws["F3"].font = ft_title # CAMBIADO: Ahora aplica tamaño 14
-    ws["F4"].font = ft_title # CAMBIADO: Ahora aplica tamaño 14
+    ws["F4"] = titulo_crono # <--- Título dinámico inyectado aquí
+    ws["F3"].font = ft_title 
+    ws["F4"].font = ft_title 
     ws["F3"].alignment = Alignment(horizontal="center")
     ws["F4"].alignment = Alignment(horizontal="center")
 
-    # 🖼️ NUEVO CÓDIGO QUIRÚRGICO PARA EL LOGO BAM
-    # Este bloque inserta y posiciona el logo en la esquina superior derecha
+    # 🖼️ LOGO BAM
     try:
-        # Asumimos que el archivo 'logo_bam.png' existe en la misma carpeta del script
         logo = OpenpyxlImage('logo_bam.png') 
-        
-        # Ajustamos el tamaño para que se vea bien como en las referencias (ancho de 120px)
         logo.width = 195
         logo.height = 55
-
-        # Anclamos la imagen a la celda I2 (esquina superior derecha del marco)
-        # Esto posiciona el logo a la derecha de los títulos y por encima del cuadro verde
         ws.add_image(logo, 'I2')
-        
     except FileNotFoundError:
-        # Si no se encuentra el archivo, mostramos un error en Streamlit pero no detenemos la app
-        st.warning("⚠️ No se encontró el archivo de imagen 'logo_bam.png' en la carpeta del script. El cronograma se generará sin el logo en la cabecera.")
-    # 🖼️ Fin de código del logo
+        st.warning("⚠️ No se encontró el archivo de imagen 'logo_bam.png'.")
 
-
-
-    
-    # Textos que luego se pintarán
+    # CARACTERÍSTICAS (Ahora incluye Documentos)
     ws["C6"] = "CARACTERISTICAS DE LA INVERSION"
     etiquetas = ["Nombre Inversionista", "Plazo", "Moneda", "Monto a invertir", 
                  "Tasa Nominal Anual (TNA)", "Fecha de Inversión", "Frecuencia del cupón", 
-                 "Tasa de Retención de Impuesto", "Fecha de Redención"]
-    valores = [inv, plazo_d, moneda, monto, tna, fecha_a_espanol(f_emi), frec, ir, fecha_a_espanol(f_red)]
+                 "Tasa de Retención de Impuesto", "Fecha de Redención", "Tipo de documento", "Número de documento"]
+    valores = [inv, plazo_d, moneda, monto, tna, fecha_a_espanol(f_emi), frec, ir, fecha_a_espanol(f_red), tipo_doc, num_doc]
     
     for i, (et, val) in enumerate(zip(etiquetas, valores)):
         ws.cell(row=7+i, column=3, value=et)
         ws.cell(row=7+i, column=9, value=val)
         
-    ws["C17"] = "COTIZACION A INVERSIONISTA"
-    ws["C19"] = "MONTO A INVERTIR"
-    ws["F19"] = moneda 
-    ws["F19"].alignment = Alignment(horizontal="center")
-    ws["I19"] = monto
-    ws["I19"].number_format = '#,##0.00'
+    # FILAS DESPLAZADAS +2
+    ws["C19"] = "COTIZACION A INVERSIONISTA"
+    ws["C21"] = "MONTO A INVERTIR"
+    ws["F21"] = moneda 
+    ws["F21"].alignment = Alignment(horizontal="center")
+    ws["I21"] = monto
+    ws["I21"].number_format = '#,##0.00'
+    
+    # Formatos de tabla superior
     ws["I10"].number_format = '#,##0.00'
     ws["I11"].number_format = '0.00##%'
     ws["I14"].number_format = '0.00%'       
     
-    # Llenado de Cabeceras (C21 a I21)
+    # Llenado de Cabeceras (Ahora en fila 23)
     headers = list(df.columns)
     for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=21, column=col_num+2)
+        cell = ws.cell(row=23, column=col_num+2)
         cell.value = header
         cell.alignment = Alignment(horizontal="center")
     borde_limpio = Side(border_style="thin", color="000000")
     borde_sencillo = Border(bottom=borde_limpio)        
     for c in range(3, 10): 
-        ws.cell(row=21, column=c).border = borde_sencillo
+        ws.cell(row=23, column=c).border = borde_sencillo
 
-    # Llenado dinámico de Filas de datos
-    for r_idx, row_data in enumerate(df.values, 22):
+    # Llenado dinámico de Filas de datos (Inicia en fila 24)
+    for r_idx, row_data in enumerate(df.values, 24):
         for c_idx, value in enumerate(row_data, 1):
             cell = ws.cell(row=r_idx, column=c_idx+2)
 
-            if c_idx == 1: # Columna Pago
+            if c_idx == 1:
                 cell.value = value
                 cell.alignment = Alignment(horizontal="left")
-            elif c_idx == 2: # Columna Fecha de vencimiento
+            elif c_idx == 2:
                 cell.value = fecha_a_espanol(value)
                 cell.alignment = Alignment(horizontal="left")
-            elif c_idx == 3: # Plazo
+            elif c_idx == 3:
                 if pd.notnull(value):
                     cell.value = int(value)
                     cell.number_format = '0'
                 cell.alignment = Alignment(horizontal="center")
-            elif c_idx in [5, 6, 7]: # Finanzas (Cupón, Retención IR, Neto a pagar)
+            elif c_idx in [5, 6, 7]:
                 if pd.notnull(value):
-                    # Redondeamos el valor matemáticamente a 2 decimales antes de pasarlo a Excel
                     cell.value = round(float(value), 2)
-                    # Forzamos a Excel a mostrar siempre 2 decimales y comas de miles
                     cell.number_format = '#,##0.00'
                 cell.alignment = Alignment(horizontal="right")
-            else: # Resto
+            else:
                 cell.value = value
                 cell.alignment = Alignment(horizontal="center")
 
     # Fila final de sumatoria
-    fila_actual = 22 + len(df)
+    fila_actual = 24 + len(df)
     for c_idx in range(1, 8):
         cell = ws.cell(row=fila_actual, column=c_idx+2)
         if c_idx == 1:
@@ -363,37 +357,36 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
             cell.value = moneda
             cell.alignment = Alignment(horizontal="center")
         elif c_idx == 7:
-            cell.value = f"=SUM(I22:I{fila_actual-1})"
+            cell.value = f"=SUM(I24:I{fila_actual-1})"
             cell.number_format = '#,##0.00'
             cell.alignment = Alignment(horizontal="right")
 
     # ==========================================
-    # 🖼️ MOTOR DE PINTADO Y MARCOS (FRAME EFFECT)
+    # 🖼️ MOTOR DE PINTADO Y MARCOS 
     # ==========================================
-    
-    # 1. Borde Superior: Fila 6 (desde B hasta J)
     for c in range(2, 11):
         cell = ws.cell(row=6, column=c)
         cell.fill = fill_dark_green
         if cell.value: cell.font = ft_white_bold
         
-    # 2. Bordes Laterales: Columnas B y J (desde fila 6 hasta fila_actual)
     for r in range(6, fila_actual + 1):
-        ws.cell(row=r, column=2).fill = fill_dark_green  # Columna B
-        ws.cell(row=r, column=10).fill = fill_dark_green # Columna J
+        ws.cell(row=r, column=2).fill = fill_dark_green  
+        ws.cell(row=r, column=10).fill = fill_dark_green 
 
-    for r in range(7, 16):
-        cell = ws.cell(row=r, column=9)  # Columna I
+    # Borde derecho de las características (Hasta fila 17)
+    for r in range(7, 18):
+        cell = ws.cell(row=r, column=9)  
         cell.alignment = Alignment(horizontal="right")
 
-
-    # 3. Franjas Intermedias solicitadas: Filas 17, 19, 21 y la fila_actual (C a I)
-    for r in [17, 19, fila_actual]:
+    # Franjas Intermedias desplazadas: Filas 19, 21 y la fila_actual
+    for r in [19, 21, fila_actual]:
         for c in range(3, 10):
             cell = ws.cell(row=r, column=c)
             cell.fill = fill_dark_green
             if cell.value: cell.font = ft_white_bold
-            cell = ws.cell(row=21, column=c)
+            
+            # Cabeceras de tabla están en la fila 23
+            cell = ws.cell(row=23, column=c)
             cell.font = ft_purple_bold
             if c in [3, 4]: 
                 cell.alignment = Alignment(horizontal="left")
@@ -405,53 +398,36 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
     borde_punteado = Side(border_style="hair", color="000000")
     borde_completo = Border(top=borde_punteado, bottom=borde_punteado)
     
-    # Bucle quirúrgico: Solo afecta de la fila 7 a 15, y columna C(3) a I(9)
-    for r in range(7, 16):     
+    # Filas punteadas de características (De 7 a 17)
+    for r in range(7, 18):     
         for c in range(3, 10): 
             ws.cell(row=r, column=c).border = borde_completo
     
-    # ==========================================
     # 📏 AJUSTE DE COLUMNAS EXPANDIDAS
-    # ==========================================
     columnas_ancho = {
-        'A': 10.82,  
-        'B': 2,  # Borde Izquierdo estrecho
-        'C': 11.18, 
-        'D': 27, 
-        'E': 10, 
-        'F': 10.5, 
-        'G': 10.9, 
-        'H': 15.2, 
-        'I': 26, 
-        'J': 2   # Borde Derecho estrecho
+        'A': 10.82, 'B': 2, 'C': 11.18, 'D': 27, 'E': 10, 
+        'F': 10.5, 'G': 10.9, 'H': 15.2, 'I': 26, 'J': 2
     }
     for col_letter, width in columnas_ancho.items():
         ws.column_dimensions[col_letter].width = width
     
-    # NUEVO: Bucle maestro de tipografía
     fuente_global = "Aptos Narrow"
-    for row in ws.iter_rows(): # Recorre todas las filas que tienen datos
+    for row in ws.iter_rows(): 
         for cell in row:
-            if cell.font: # Si la celda tiene una fuente asignada...
-                # Clonamos la fuente original y le cambiamos el nombre
+            if cell.font: 
                 nueva_fuente = copy.copy(cell.font)
                 nueva_fuente.name = fuente_global
-                cell.font = nueva_fuente # Guardamos los cambios
+                cell.font = nueva_fuente 
 
-
-# === AJUSTES DE IMPRESIÓN PARA PDF PERFECTO (VERSIÓN LIBREOFFICE) ===
+    # === AJUSTES DE IMPRESIÓN PARA PDF PERFECTO ===
     ws.print_options.horizontalCentered = True
-    ws.print_area = f'A1:K{fila_actual + 2}' # Ampliamos ligeramente el área de captura
+    ws.print_area = f'A1:K{fila_actual + 2}' 
     
-    # 1. Forzar orientación horizontal (apaisada)
     ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+    ws.page_setup.fitToPage = True 
+    ws.page_setup.fitToWidth = 1   
+    ws.page_setup.fitToHeight = 1  
     
-    # 2. Configurar el escalado estricto
-    ws.page_setup.fitToPage = True # Activa el modo de ajuste automático
-    ws.page_setup.fitToWidth = 1   # Fuerza 1 página de ancho
-    ws.page_setup.fitToHeight = 1  # Fuerza 1 página de alto (vital para evitar el salto de página)
-    
-    # 3. Papel A4 y márgenes mínimos absolutos
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
     ws.page_margins.left = 0.1
     ws.page_margins.right = 0.1
@@ -459,9 +435,7 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
     ws.page_margins.bottom = 0.3
     ws.page_margins.header = 0.0
     ws.page_margins.footer = 0.0
-    # ====================================================================
 
-    # Guardar en memoria y retornar
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
@@ -527,8 +501,15 @@ nombre_archivo_limpio = complemento_archivo.replace(' ', '_').replace('/', '-')
 nombre_archivo_excel = f"CRONO-{codigo_serie}-{Letra_serie}-{nombre_archivo_limpio}.xlsx"
 nombre_archivo_pdf = f"CRONO-{codigo_serie}-{Letra_serie}-{nombre_archivo_limpio}.pdf"
 
+# === NUEVA LÓGICA DE TÍTULO DINÁMICO ===
+if emision and "No aplica" not in emision:
+    titulo_cronograma = f"CRONOGRAMA: {programa} - {emision}"
+else:
+    titulo_cronograma = f"CRONOGRAMA: {programa}"
+
 # 1. Generamos el Excel base (siempre se necesita, ya sea para descargar o como molde del PDF)
-excel_file = generar_excel_bam(df, inversionista, plazo_total_dias, moneda, monto, tna, fecha_emision, fecha_redencion, frecuencia, tasa_ir)
+excel_file = generar_excel_bam(df, inversionista, plazo_total_dias, moneda, monto, tna, fecha_emision, fecha_redencion, frecuencia, tasa_ir, 
+    titulo_cronograma, tipo_documento, numero_documento)
 
 col_btn1, col_btn2 = st.columns(2)
 
