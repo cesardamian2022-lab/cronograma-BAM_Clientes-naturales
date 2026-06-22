@@ -81,12 +81,12 @@ with st.sidebar:
         codigo_serie = "1PC"
         # Queda libre para que el usuario elija, pero con la alerta de riesgo operativo
     
-    inversionista = st.text_input("I7: Nombre Inversionista", "Federico Oviedo / Maria de la Cruz")
+    inversionista = st.text_input("I7: Nombre Inversionista", "")
 
-    Letra_serie = st.text_input("I7: Letra de la Serie", "Letra de la serie")
+    Letra_serie = st.text_input("I7: Letra de la Serie", "")
 
     # === NUEVOS INPUTS DE DOCUMENTO ===
-    tipo_documento = st.selectbox("Tipo de documento", ["DNI", "RUC", "CE", "Pasaporte"], index=1)
+    tipo_documento = st.selectbox("Tipo de documento", ["DNI", "RUC", "CE","CI", "Pasaporte"], index=1)
     numero_documento = st.text_input("Número de documento", "")
     # ==================================
     
