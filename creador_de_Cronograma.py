@@ -437,22 +437,27 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
                 cell.font = nueva_fuente # Guardamos los cambios
 
 
-# === AJUSTES DE IMPRESIÓN PARA PDF PERFECTO ===
+# === AJUSTES DE IMPRESIÓN PARA PDF PERFECTO (VERSIÓN LIBREOFFICE) ===
     ws.print_options.horizontalCentered = True
-    ws.print_area = f'B2:J{fila_actual}' 
+    ws.print_area = f'A1:K{fila_actual + 2}' # Ampliamos ligeramente el área de captura
     
-    # Asegurar que escale a 1 página de ancho
-    ws.page_setup.fitToWidth = 1 
-    ws.page_setup.fitToHeight = 0 
+    # 1. Forzar orientación horizontal (apaisada)
+    ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
     
-    # NUEVA MODIFICACIÓN QUIRÚRGICA: Reducir márgenes y fijar papel A4
-    ws.page_margins.left = 0.25
-    ws.page_margins.right = 0.25
-    ws.page_margins.top = 0.5
-    ws.page_margins.bottom = 0.5
+    # 2. Configurar el escalado estricto
+    ws.page_setup.fitToPage = True # Activa el modo de ajuste automático
+    ws.page_setup.fitToWidth = 1   # Fuerza 1 página de ancho
+    ws.page_setup.fitToHeight = 1  # Fuerza 1 página de alto (vital para evitar el salto de página)
+    
+    # 3. Papel A4 y márgenes mínimos absolutos
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
-    # ==============================================
-
+    ws.page_margins.left = 0.1
+    ws.page_margins.right = 0.1
+    ws.page_margins.top = 0.3
+    ws.page_margins.bottom = 0.3
+    ws.page_margins.header = 0.0
+    ws.page_margins.footer = 0.0
+    # ====================================================================
 
     # Guardar en memoria y retornar
     output = io.BytesIO()
