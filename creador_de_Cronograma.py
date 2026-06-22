@@ -82,6 +82,8 @@ with st.sidebar:
         # Queda libre para que el usuario elija, pero con la alerta de riesgo operativo
     
     inversionista = st.text_input("I7: Nombre Inversionista", "Federico Oviedo / Maria de la Cruz")
+
+    Letra_serie = st.text_input("I7: Letra de la Serie", "Letra de la serie")
     
     tipo_plazo = st.radio("Definición de Plazo", ["Días Exactos", "Años Exactos"])
     if tipo_plazo == "Días Exactos":
@@ -522,8 +524,8 @@ st.write("---")
 st.header("💾 Descargar Archivos")
 
 nombre_archivo_limpio = complemento_archivo.replace(' ', '_').replace('/', '-')
-nombre_archivo_excel = f"CRONO-{codigo_serie}-O-{nombre_archivo_limpio}.xlsx"
-nombre_archivo_pdf = f"CRONO-{codigo_serie}-O-{nombre_archivo_limpio}.pdf"
+nombre_archivo_excel = f"CRONO-{codigo_serie}-{Letra_serie}-{nombre_archivo_limpio}.xlsx"
+nombre_archivo_pdf = f"CRONO-{codigo_serie}-{Letra_serie}-{nombre_archivo_limpio}.pdf"
 
 # 1. Generamos el Excel base (siempre se necesita, ya sea para descargar o como molde del PDF)
 excel_file = generar_excel_bam(df, inversionista, plazo_total_dias, moneda, monto, tna, fecha_emision, fecha_redencion, frecuencia, tasa_ir)
