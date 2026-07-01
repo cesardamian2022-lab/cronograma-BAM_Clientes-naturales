@@ -261,9 +261,12 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
     fill_dark_green = PatternFill(start_color="196B24", end_color="196B24", fill_type="solid") 
     ft_title = Font(bold=True, size=14) 
 
+    # 💡 PRO-TIP: Formato de fecha forzado a español de Perú para evitar cruces regionales
+    formato_fecha_elegante = '[$-es-PE]ddd, dd "de" mmmm "de" yyyy'
+
     # Títulos base dinámicos
     ws["F3"] = "BOSQUES AMAZÓNICOS S.A."
-    ws["F4"] = titulo_crono # <--- Título dinámico inyectado aquí
+    ws["F4"] = titulo_crono
     ws["F3"].font = ft_title 
     ws["F4"].font = ft_title 
     ws["F3"].alignment = Alignment(horizontal="center")
@@ -276,33 +279,50 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
         logo.height = 55
         ws.add_image(logo, 'I2')
     except FileNotFoundError:
-        st.warning("⚠️ No se encontró el archivo de imagen 'logo_bam.png'.")
+        pass # Streamlit ya maneja el warning en el front
 
-    # CARACTERÍSTICAS (Ahora incluye Documentos)
+    # --- CARACTERÍSTICAS (Ahora con fechas reales y fórmulas) ---
     ws["C6"] = "CARACTERISTICAS DE LA INVERSION"
     etiquetas = ["Nombre Inversionista", "Plazo", "Moneda", "Monto a invertir", 
                  "Tasa Nominal Anual (TNA)", "Fecha de Inversión", "Frecuencia del cupón", 
                  "Tasa de Retención de Impuesto", "Fecha de Redención", "Tipo de documento", "Número de documento"]
-    valores = [inv, plazo_d, moneda, monto, tna, fecha_a_espanol(f_emi), frec, ir, fecha_a_espanol(f_red), tipo_doc, num_doc]
+    
+    # Pasamos las fechas nativas (f_emi, f_red)
+    valores = [inv, plazo_d, moneda, monto, tna, f_emi, frec, ir, f_red, tipo_doc, num_doc]
     
     for i, (et, val) in enumerate(zip(etiquetas, valores)):
         ws.cell(row=7+i, column=3, value=et)
-        ws.cell(row=7+i, column=9, value=val)
+        celda_valor = ws.cell(row=7+i, column=9)
         
+        # Inyectamos formatos y fórmulas en la cabecera
+        if et == "Fecha de Inversión":
+            celda_valor.value = val
+            celda_valor.number_format = formato_fecha_elegante
+            celda_valor.alignment = Alignment(horizontal="right")
+        elif et == "Fecha de Redención":
+            # Fórmula: Fecha Inversión (I12) + Plazo en días (I8)
+            celda_valor.value = "=I12+I8"
+            celda_valor.number_format = formato_fecha_elegante
+            celda_valor.alignment = Alignment(horizontal="right")
+        else:
+            celda_valor.value = val
+            celda_valor.alignment = Alignment(horizontal="right")
+            
     # FILAS DESPLAZADAS +2
     ws["C19"] = "COTIZACION A INVERSIONISTA"
     ws["C21"] = "MONTO A INVERTIR"
-    ws["F21"] = moneda 
+    ws["F21"] = f"=$I$9" # Referencia a la celda de Moneda
     ws["F21"].alignment = Alignment(horizontal="center")
-    ws["I21"] = monto
+    ws["I21"] = f"=$I$10" # Referencia a la celda de Monto
     ws["I21"].number_format = '#,##0.00'
     
     # Formatos de tabla superior
+    ws["I8"].number_format = '0'
     ws["I10"].number_format = '#,##0.00'
     ws["I11"].number_format = '0.00##%'
     ws["I14"].number_format = '0.00%'       
     
-    # Llenado de Cabeceras (Ahora en fila 23)
+    # Llenado de Cabeceras (Fila 23)
     headers = list(df.columns)
     for col_num, header in enumerate(headers, 1):
         cell = ws.cell(row=23, column=col_num+2)
@@ -313,44 +333,63 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
     for c in range(3, 10): 
         ws.cell(row=23, column=c).border = borde_sencillo
 
-    # Llenado dinámico de Filas de datos (Inicia en fila 24)
-    for r_idx, row_data in enumerate(df.values, 24):
-        for c_idx, value in enumerate(row_data, 1):
-            cell = ws.cell(row=r_idx, column=c_idx+2)
-
-            if c_idx == 1:
-                cell.value = value
-                cell.alignment = Alignment(horizontal="left")
-            elif c_idx == 2:
-                cell.value = fecha_a_espanol(value)
-                cell.alignment = Alignment(horizontal="left")
-            elif c_idx == 3:
-                if pd.notnull(value):
-                    cell.value = int(value)
-                    cell.number_format = '0'
-                cell.alignment = Alignment(horizontal="center")
-            elif c_idx in [5, 6, 7]:
-                if pd.notnull(value):
-                    cell.value = round(float(value), 2)
-                    cell.number_format = '#,##0.00'
-                cell.alignment = Alignment(horizontal="right")
+    # --- LLENADO DINÁMICO DE FILAS CON FÓRMULAS ---
+    fila_inicio = 24
+    for r_idx, row_data in enumerate(df.values, fila_inicio):
+        pago_str = row_data[0]
+        fecha_vencimiento = row_data[1] # datetime nativo desde Pandas
+        
+        # Columna C: Pago
+        ws[f'C{r_idx}'] = pago_str
+        ws[f'C{r_idx}'].alignment = Alignment(horizontal="left")
+        
+        # Columna D: Fecha de vencimiento (Formato elegante)
+        ws[f'D{r_idx}'] = fecha_vencimiento
+        ws[f'D{r_idx}'].number_format = formato_fecha_elegante
+        ws[f'D{r_idx}'].alignment = Alignment(horizontal="left")
+        
+        if pago_str == "Capital":
+            ws[f'E{r_idx}'] = "" # Plazo
+            ws[f'F{r_idx}'] = "=$I$9" 
+            ws[f'F{r_idx}'].alignment = Alignment(horizontal="center")
+            ws[f'G{r_idx}'] = "" # Cupón
+            ws[f'H{r_idx}'] = "" # Retención
+            ws[f'I{r_idx}'] = "=$I$10" # Devolución del Principal
+            ws[f'I{r_idx}'].number_format = '#,##0.00'
+        else:
+            # Columna E: Plazo
+            if r_idx == fila_inicio:
+                ws[f'E{r_idx}'] = f"=D{r_idx}-I12" 
             else:
-                cell.value = value
-                cell.alignment = Alignment(horizontal="center")
+                ws[f'E{r_idx}'] = f"=D{r_idx}-D{r_idx-1}" 
+            ws[f'E{r_idx}'].number_format = '0'
+            ws[f'E{r_idx}'].alignment = Alignment(horizontal="center")
+            
+            # Columna F: Moneda
+            ws[f'F{r_idx}'] = "=$I$9"
+            ws[f'F{r_idx}'].alignment = Alignment(horizontal="center")
+            
+            # Columna G: Cupón
+            ws[f'G{r_idx}'] = f"=$I$10*($I$11/360)*E{r_idx}"
+            ws[f'G{r_idx}'].number_format = '#,##0.00'
+            
+            # Columna H: Retención IR
+            ws[f'H{r_idx}'] = f"=-G{r_idx}*$I$14"
+            ws[f'H{r_idx}'].number_format = '#,##0.00'
+            
+            # Columna I: Neto a pagar
+            ws[f'I{r_idx}'] = f"=G{r_idx}+H{r_idx}"
+            ws[f'I{r_idx}'].number_format = '#,##0.00'
 
     # Fila final de sumatoria
-    fila_actual = 24 + len(df)
-    for c_idx in range(1, 8):
-        cell = ws.cell(row=fila_actual, column=c_idx+2)
-        if c_idx == 1:
-            cell.value = "MONTO A RECIBIR"
-        elif c_idx == 4:
-            cell.value = moneda
-            cell.alignment = Alignment(horizontal="center")
-        elif c_idx == 7:
-            cell.value = f"=SUM(I24:I{fila_actual-1})"
-            cell.number_format = '#,##0.00'
-            cell.alignment = Alignment(horizontal="right")
+    fila_actual = fila_inicio + len(df)
+    ws[f'C{fila_actual}'] = "MONTO A RECIBIR"
+    ws[f'F{fila_actual}'] = "=$I$9"
+    ws[f'F{fila_actual}'].alignment = Alignment(horizontal="center")
+    
+    ws[f'I{fila_actual}'] = f"=SUM(I{fila_inicio}:I{fila_actual-1})"
+    ws[f'I{fila_actual}'].number_format = '#,##0.00'
+    ws[f'I{fila_actual}'].alignment = Alignment(horizontal="right")
 
     # ==========================================
     # 🖼️ MOTOR DE PINTADO Y MARCOS 
@@ -367,16 +406,16 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
     # Borde derecho de las características (Hasta fila 17)
     for r in range(7, 18):
         cell = ws.cell(row=r, column=9)  
-        cell.alignment = Alignment(horizontal="right")
+        if r not in [12, 15]: 
+            cell.alignment = Alignment(horizontal="right")
 
-    # Franjas Intermedias desplazadas: Filas 19, 21 y la fila_actual
+    # Franjas Intermedias
     for r in [19, 21, fila_actual]:
         for c in range(3, 10):
             cell = ws.cell(row=r, column=c)
             cell.fill = fill_dark_green
             if cell.value: cell.font = ft_white_bold
             
-            # Cabeceras de tabla están en la fila 23
             cell = ws.cell(row=23, column=c)
             cell.font = ft_purple_bold
             if c in [3, 4]: 
@@ -389,14 +428,13 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
     borde_punteado = Side(border_style="hair", color="000000")
     borde_completo = Border(top=borde_punteado, bottom=borde_punteado)
     
-    # Filas punteadas de características (De 7 a 17)
     for r in range(7, 18):     
         for c in range(3, 10): 
             ws.cell(row=r, column=c).border = borde_completo
     
     # 📏 AJUSTE DE COLUMNAS EXPANDIDAS
     columnas_ancho = {
-        'A': 10.82, 'B': 2, 'C': 11.18, 'D': 27, 'E': 10, 
+        'A': 10.82, 'B': 2, 'C': 11.18, 'D': 33, 'E': 10,  # Expandimos 'D' de 27 a 33 para dar espacio al texto largo de la fecha
         'F': 10.5, 'G': 10.9, 'H': 15.2, 'I': 26, 'J': 2
     }
     for col_letter, width in columnas_ancho.items():
@@ -431,7 +469,6 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
     wb.save(output)
     output.seek(0)
     return output
-
 # --- 6. EXPORTACIÓN A PDF (VIA EXCEL NATIVO) ---
 def generar_pdf_desde_excel(excel_bytes):
     temp_dir = tempfile.gettempdir()
