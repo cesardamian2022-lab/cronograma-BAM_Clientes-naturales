@@ -6,7 +6,7 @@ import io
 import copy
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Side, Border
-from openpyxl.drawing.image import Image as OpenpyxlImage # NUEVO: Para insertar el logo
+from openpyxl.drawing.image import Image as OpenpyxlImage
 import os
 import tempfile
 import subprocess
@@ -33,13 +33,13 @@ def fecha_a_espanol(fecha):
 with st.sidebar:
     st.header("⚙️ Parámetros de la Inversión")
     
-
-    # NUEVO: Input para que definas la parte complementaria del archivo
+    # Input para que definas la parte complementaria del archivo
     complemento_archivo = st.text_input("Complemento para Archivo", "Nombre_del_Fondo_o_Cliente")
 
-   # Variables de control vacías al inicio de la barra lateral
+    # Variables de control vacías al inicio de la barra lateral (¡AQUÍ INICIALIZAMOS EMISIÓN!)
     codigo_serie = ""
     moneda_forzada = None
+    emision = "" # <-- Corrección clave: Inicializamos la variable por defecto
 
     programas = [
         "1° Programa Bonos Sostenibles",
@@ -66,29 +66,29 @@ with st.sidebar:
         elif emision == "3° Emisión-Bonos": codigo_serie = "3E IRD"
         
     elif programa == "1° Emisión Individual de Bonos USD":
-        st.selectbox("Emisión", ["No aplica (Emisión Individual)"], disabled=True)
+        # Corrección: Ahora asignamos el selectbox a la variable 'emision'
+        emision = st.selectbox("Emisión", ["No aplica (Emisión Individual)"], disabled=True)
         codigo_serie = "1E IND"
         moneda_forzada = "USD" # Fuerza Dólares
         
-    # === AQUÍ QUEDA TU CORRECCIÓN ===
     elif programa == "2° Emisión Individual de Bonos PEN":
-        st.selectbox("Emisión", ["No aplica (Emisión Individual)"], disabled=True)
+        # Corrección: Ahora asignamos el selectbox a la variable 'emision'
+        emision = st.selectbox("Emisión", ["No aplica (Emisión Individual)"], disabled=True)
         codigo_serie = "2E IND"
         moneda_forzada = "PEN" # Fuerza Soles
         
     elif programa == "1° Emisión de Papeles Comerciales (USD-PEN)":
-        st.selectbox("Emisión", ["No aplica (Emisión Individual)"], disabled=True)
+        # Corrección: Ahora asignamos el selectbox a la variable 'emision'
+        emision = st.selectbox("Emisión", ["No aplica (Emisión Individual)"], disabled=True)
         codigo_serie = "1PC"
         # Queda libre para que el usuario elija, pero con la alerta de riesgo operativo
     
     inversionista = st.text_input("I7: Nombre Inversionista", "")
-
     Letra_serie = st.text_input("I7: Letra de la Serie", "")
 
-    # === NUEVOS INPUTS DE DOCUMENTO ===
+    # NUEVOS INPUTS DE DOCUMENTO
     tipo_documento = st.selectbox("Tipo de documento", ["DNI", "RUC", "CE","CI", "Pasaporte"], index=1)
     numero_documento = st.text_input("Número de documento", "")
-    # ==================================
     
     tipo_plazo = st.radio("Definición de Plazo", ["Días Exactos", "Años Exactos"])
     if tipo_plazo == "Días Exactos":
@@ -103,17 +103,11 @@ with st.sidebar:
     else:
         # Si no hay restricción, dejamos elegir libremente
         moneda = st.selectbox("I9: Moneda", ["USD", "PEN"])
-
-
-
         
         # Alerta especial solo para Papeles Comerciales
         if programa == "1° Emisión de Papeles Comerciales (USD-PEN)":
             st.warning("⚠️ ATENCIÓN: Verifique que la moneda sea la correcta para esta emisión de Papeles Comerciales.")
     
-    
-
-
     monto = st.number_input("I10: Monto a invertir", min_value=1000.0, value=130000.0, step=1000.0)
     
     tipo_tasa = st.selectbox("I11: Tipo de Tasa", ["Anual", "Mensual", "A Vencimiento"])
@@ -252,9 +246,6 @@ st.dataframe(df_mostrar, use_container_width=True, hide_index=True)
 # Total Neto incluye todos los cupones netos + el capital devuelto
 total_neto = df["Neto a pagar"].sum()
 st.success(f"**MONTO A RECIBIR: {moneda} {total_neto:,.2f}**")
-
-# --- 5. EXPORTACIÓN A EXCEL (PLANTILLA CORPORATIVA ENMARCADA) ---
-
 
 # --- 5. EXPORTACIÓN A EXCEL (PLANTILLA CORPORATIVA ENMARCADA) ---
 def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, ir, titulo_crono, tipo_doc, num_doc):
@@ -489,9 +480,6 @@ def generar_pdf_desde_excel(excel_bytes):
         pass 
         
     return pdf_output
-
-
-
 
 # --- 7. CONTROL DE DESCARGAS ---
 st.write("---")
