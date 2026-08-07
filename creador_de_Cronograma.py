@@ -91,11 +91,15 @@ with st.sidebar:
     tipo_documento = st.selectbox("Tipo de documento", ["DNI", "RUC", "CE","CI", "Pasaporte"], index=1)
     numero_documento = st.text_input("Número de documento", "")
     
-    tipo_plazo = st.radio("Definición de Plazo", ["Días Exactos", "Años Exactos"])
-    if tipo_plazo == "Días Exactos":
-        plazo_input = st.number_input("I8: Plazo en Días", min_value=30, value=731)
+    tipo_plazo = st.radio("Definición de Plazo", ["Días", "Meses", "Años"])
+    
+    if tipo_plazo == "Días":
+        plazo_input = st.number_input("I8: Plazo en Días", min_value=30, value=730, step=1)
+    elif tipo_plazo == "Meses":
+        plazo_input = st.number_input("Plazo en Meses", min_value=1, value=18, step=1)
     else:
-        plazo_input = st.number_input("Cantidad de Años", min_value=1, value=2)
+        # Años permitiendo decimales (ej. 1.5)
+        plazo_input = st.number_input("Cantidad de Años (ej. 1.5)", min_value=0.5, value=1.5, step=0.5, format="%.1f")
         
     if moneda_forzada:
         # Si las reglas de arriba dictaron una moneda, bloqueamos la caja
@@ -117,7 +121,7 @@ with st.sidebar:
     escoger_pdf = st.selectbox("Generar en Formato PDF", ["NO", "SÍ"], index=0)
 
     fecha_emision = st.date_input("I12: Fecha de Inversión (Emisión)", datetime(2026, 5, 11))
-    frecuencia = st.selectbox("I13: Frecuencia del cupón", ["Trimestral", "Mensual"])
+    frecuencia = st.selectbox("I13: Frecuencia del cupón", ["Mensual","Trimestral","Anual","Vencimiento","Bimestral","Semestral"])
     
     tipo_entidad = st.selectbox("I14: Tipo de Inversionista (Para IR)", [
         "Persona Jurídica Domiciliada (RUC)", 
@@ -126,13 +130,16 @@ with st.sidebar:
         "Persona Natural No Domiciliada"
     ], index=2)
 
-# --- 2. MOTOR DE REGLAS DE NEGOCIO ---
-if tipo_plazo == "Años Exactos":
-    fecha_redencion = fecha_emision + relativedelta(years=plazo_input)
-    plazo_total_dias = (fecha_redencion - fecha_emision).days
-else:
+if tipo_plazo == "Días":
     plazo_total_dias = int(plazo_input)
     fecha_redencion = fecha_emision + timedelta(days=plazo_total_dias)
+else:
+    # Si es Meses, tomamos el valor directo. Si es Años (ej. 1.5), lo pasamos a meses (* 12).
+    meses_a_sumar = int(plazo_input) if tipo_plazo == "Meses" else int(plazo_input * 12)
+    
+    # relativedelta(months=...) funciona exactamente igual que FECHA.MES() en Excel
+    fecha_redencion = fecha_emision + relativedelta(months=meses_a_sumar)
+    plazo_total_dias = (fecha_redencion - fecha_emision).days
 
 tasa_ir = 0.0
 if tipo_entidad in ["Persona Jurídica No Domiciliada", "Persona Natural No Domiciliada"]:
@@ -142,8 +149,24 @@ elif tipo_entidad == "Persona Natural Domiciliada (DNI)":
 
 tna = tasa_input if tipo_tasa != "Mensual" else tasa_input * 12
 
-def calcular_primer_25(fecha_emision, frecuencia):
-    dias_teoricos = 90 if frecuencia == "Trimestral" else 30
+
+
+# --- MAPEO DE FRECUENCIAS ---
+# Esto es como una tabla de parámetros en SAP; centralizamos las reglas aquí.
+map_frecuencia = {
+    "Mensual": {"meses": 1, "dias": 30},
+    "Bimestral": {"meses": 2, "dias": 60},
+    "Trimestral": {"meses": 3, "dias": 90},
+    "Semestral": {"meses": 6, "dias": 180},
+    "Anual": {"meses": 12, "dias": 360},
+    "Al Vencimiento": {"meses": 0, "dias": 0} # No hay pagos intermedios
+}
+
+def calcular_primer_25(fecha_emision, frecuencia, map_frec):
+    if frecuencia == "Al Vencimiento":
+        return None # Si es al vencimiento, no buscamos el día 25
+        
+    dias_teoricos = map_frec[frecuencia]["dias"]
     fecha_objetivo = fecha_emision + timedelta(days=dias_teoricos)
     
     opciones = [
@@ -156,12 +179,21 @@ def calcular_primer_25(fecha_emision, frecuencia):
 # --- 3. CONSTRUCCIÓN DEL CRONOGRAMA ---
 cronograma = []
 fecha_anterior = fecha_emision
-meses_salto = 3 if frecuencia == "Trimestral" else 1
 
-fecha_siguiente = calcular_primer_25(fecha_emision, frecuencia)
 pago_num = 1
 
+if frecuencia == "Al Vencimiento":
+    # Si paga al final, saltamos directamente a la fecha de redención
+    fecha_siguiente = fecha_redencion
+    meses_salto = 0
+else:
+    # Si hay cupones intermedios, calculamos el primer pago al día 25
+    fecha_siguiente = calcular_primer_25(fecha_emision, frecuencia, map_frecuencia)
+    meses_salto = map_frecuencia[frecuencia]["meses"]
+
+# El bucle while calculará los cupones intermedios (si los hay)
 while fecha_siguiente < fecha_redencion:
+# ... (El resto de tu código dentro del while se mantiene exactamente igual)
     dias_periodo = (fecha_siguiente - fecha_anterior).days
     
     if tipo_tasa == "A Vencimiento":
