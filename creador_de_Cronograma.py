@@ -576,7 +576,7 @@ else:
 
 # 1. Generamos el Excel base (siempre se necesita, ya sea para descargar o como molde del PDF)
 excel_file = generar_excel_bam(df, inversionista, plazo_total_dias, moneda, monto, tna, fecha_emision, fecha_redencion, frecuencia, tasa_ir, 
-    titulo_cronograma, tipo_documento, numero_documento)
+    titulo_cronograma, tipo_documento, numero_documento, tipo_tasa) # <-- ¡Añadido al final!
 
 col_btn1, col_btn2 = st.columns(2)
 
