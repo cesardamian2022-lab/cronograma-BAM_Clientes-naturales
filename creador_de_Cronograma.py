@@ -84,10 +84,9 @@ with st.sidebar:
         codigo_serie = "1PC"
         # Queda libre para que el usuario elija, pero con la alerta de riesgo operativo
     
-    inversionista = st.text_input("I7: Nombre Inversionista", "")
-    Letra_serie = st.text_input("I7: Letra de la Serie", "")
+    inversionista = st.text_input("I7: Nombre Inversionista", "Federico Oviedo / Maria de la Cruz")
 
-    # NUEVOS INPUTS DE DOCUMENTO
+    Serie_Letra = st.text_input("I7: Serie", "Letra de Serie")
     tipo_documento = st.selectbox("Tipo de documento", ["DNI", "RUC", "CE","CI", "Pasaporte"], index=1)
     numero_documento = st.text_input("Número de documento", "")
     
@@ -115,14 +114,14 @@ with st.sidebar:
     
     monto = st.number_input("I10: Monto a invertir", min_value=1000.0, value=130000.0, step=1000.0)
     
-    tipo_tasa = st.selectbox("I11: Tipo de Tasa", ["Anual", "Mensual", "A Vencimiento"])
+    tipo_tasa = st.selectbox("I11: Tipo de Tasa", ["Anual", "Mensual", "Al Vencimiento"])
     tasa_input = st.number_input("Tasa Nominal (%)", value=10.25, step=0.01, format="%.2f") / 100
     
     escoger_pdf = st.selectbox("Generar en Formato PDF", ["NO", "SÍ"], index=0)
 
     fecha_emision = st.date_input("I12: Fecha de Inversión (Emisión)", datetime(2026, 5, 11))
-    frecuencia = st.selectbox("I13: Frecuencia del cupón", ["Mensual","Trimestral","Anual","Vencimiento","Bimestral","Semestral"])
-    
+    frecuencia = st.selectbox("I13: Frecuencia del cupón", ["Mensual","Trimestral","Anual","Al Vencimiento","Bimestral","Semestral"])
+
     tipo_entidad = st.selectbox("I14: Tipo de Inversionista (Para IR)", [
         "Persona Jurídica Domiciliada (RUC)", 
         "Persona Jurídica No Domiciliada",
@@ -191,12 +190,11 @@ else:
     fecha_siguiente = calcular_primer_25(fecha_emision, frecuencia, map_frecuencia)
     meses_salto = map_frecuencia[frecuencia]["meses"]
 
-# El bucle while calculará los cupones intermedios (si los hay)
+    # El bucle while calculará los cupones intermedios (si los hay)
 while fecha_siguiente < fecha_redencion:
-# ... (El resto de tu código dentro del while se mantiene exactamente igual)
     dias_periodo = (fecha_siguiente - fecha_anterior).days
     
-    if tipo_tasa == "A Vencimiento":
+    if tipo_tasa == "Al Vencimiento":
         cupon_bruto = monto * tasa_input
     else:
         cupon_bruto = monto * (tna / 360) * dias_periodo
@@ -218,9 +216,9 @@ while fecha_siguiente < fecha_redencion:
     fecha_anterior = fecha_siguiente
     fecha_siguiente = fecha_siguiente + relativedelta(months=meses_salto)
 
-dias_ultimo_periodo = (fecha_redencion - fecha_anterior).days
-if dias_ultimo_periodo > 0:
-    cupon_bruto = monto * tasa_input if tipo_tasa == "A Vencimiento" else monto * (tna / 360) * dias_ultimo_periodo
+    dias_ultimo_periodo = (fecha_redencion - fecha_anterior).days
+    if dias_ultimo_periodo > 0:
+        cupon_bruto = monto * tasa_input if tipo_tasa == "Al Vencimiento" else monto * (tna / 360) * dias_ultimo_periodo
     retencion = cupon_bruto * tasa_ir
     neto = cupon_bruto - retencion
     
@@ -606,3 +604,4 @@ with col_btn2:
             help="Selecciona 'SÍ' en la barra lateral (Creación de PDF) para habilitar esta descarga.",
             use_container_width=True
         )
+    
