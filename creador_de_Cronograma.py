@@ -287,7 +287,7 @@ total_neto = df["Neto a pagar"].sum()
 st.success(f"**MONTO A RECIBIR: {moneda} {total_neto:,.2f}**")
 
 # --- 5. EXPORTACIÓN A EXCEL (PLANTILLA CORPORATIVA ENMARCADA) ---
-def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, ir, titulo_crono, tipo_doc, num_doc):
+def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, ir, titulo_crono, tipo_doc, num_doc, tipo_tasa):
     wb = Workbook()
     ws = wb.active
     ws.title = "Cronograma"
@@ -409,7 +409,10 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
             ws[f'F{r_idx}'].alignment = Alignment(horizontal="center")
             
             # Columna G: Cupón
-            ws[f'G{r_idx}'] = f"=$I$10*($I$11/360)*E{r_idx}"
+            if tipo_tasa == "Al Vencimiento":
+                ws[f'G{r_idx}'] = f"=$I$10*$I$11" # Capital * Tasa Plana
+            else:
+                ws[f'G{r_idx}'] = f"=$I$10*($I$11/360)*E{r_idx}" # Prorrateado
             ws[f'G{r_idx}'].number_format = '#,##0.00'
             
             # Columna H: Retención IR
