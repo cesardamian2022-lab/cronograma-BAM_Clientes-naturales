@@ -335,13 +335,13 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
         
         # Inyectamos formatos y fórmulas en la cabecera
         if et == "Fecha de Inversión":
-            celda_valor.value = val
-            celda_valor.number_format = formato_fecha_elegante
+            # 🚨 Envolvemos el valor (val) en fecha_a_espanol() para forzar el texto
+            celda_valor.value = fecha_a_espanol(val)
             celda_valor.alignment = Alignment(horizontal="right")
         elif et == "Fecha de Redención":
-            # Fórmula: Fecha Inversión (I12) + Plazo en días (I8)
-            celda_valor.value = "=I12+I8"
-            celda_valor.number_format = formato_fecha_elegante
+            # 🚨 Al ser texto, ya no podemos sumar días en Excel "=I12+I8". 
+            # Le pasamos la fecha final directamente procesada por Python.
+            celda_valor.value = fecha_a_espanol(f_red) 
             celda_valor.alignment = Alignment(horizontal="right")
         else:
             celda_valor.value = val
