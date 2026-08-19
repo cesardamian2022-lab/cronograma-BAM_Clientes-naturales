@@ -86,7 +86,7 @@ with st.sidebar:
     
     inversionista = st.text_input("I7: Nombre Inversionista", "Federico Oviedo / Maria de la Cruz")
 
-    Serie_Letra = st.text_input("I7: Serie", "Letra de Serie")
+    Letra_serie = st.text_input("I7: Serie", "Letra de Serie")
     tipo_documento = st.selectbox("Tipo de documento", ["DNI", "RUC", "CE","CI", "Pasaporte"], index=1)
     numero_documento = st.text_input("Número de documento", "")
     
