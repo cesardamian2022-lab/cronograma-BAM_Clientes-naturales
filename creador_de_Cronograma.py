@@ -300,7 +300,7 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
     fill_dark_green = PatternFill(start_color="196B24", end_color="196B24", fill_type="solid") 
     ft_title = Font(bold=True, size=14) 
 
-    # 💡 PRO-TIP: Formato de fecha forzado a español de Perú para evitar cruces regionales
+    # 💡 Formato de fecha forzado a español de Perú (Vuelve a la vida)
     formato_fecha_elegante = '[$-es-PE]ddd, dd "de" mmmm "de" yyyy'
 
     # Títulos base dinámicos
@@ -338,16 +338,16 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
             if para_pdf:
                 celda_valor.value = fecha_a_espanol(val)
             else:
-                celda_valor.value = val
-                celda_valor.number_format = 'dd/mm/yyyy' # Formato Fecha Corta
+                celda_valor.value = val # Mantiene el datetime real
+                celda_valor.number_format = formato_fecha_elegante
             celda_valor.alignment = Alignment(horizontal="right")
             
         elif et == "Fecha de Redención":
             if para_pdf:
                 celda_valor.value = fecha_a_espanol(f_red)
             else:
-                celda_valor.value = "=I12+I8"
-                celda_valor.number_format = 'dd/mm/yyyy' # Formato Fecha Corta
+                celda_valor.value = "=I12+I8" # Mantiene la fórmula
+                celda_valor.number_format = formato_fecha_elegante
             celda_valor.alignment = Alignment(horizontal="right")
             
         else:
@@ -389,16 +389,16 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
         ws[f'C{r_idx}'] = pago_str
         ws[f'C{r_idx}'].alignment = Alignment(horizontal="left")
         
-        # Columna D: Fecha de vencimiento (Línea 218 aprox)
+        # Columna D: Fecha de vencimiento
         if para_pdf:
             ws[f'D{r_idx}'] = fecha_a_espanol(fecha_vencimiento)
         else:
-            ws[f'D{r_idx}'] = fecha_vencimiento
-            ws[f'D{r_idx}'].number_format = 'dd/mm/yyyy' # Formato Fecha Corta
+            ws[f'D{r_idx}'] = fecha_vencimiento # Mantiene el datetime real
+            ws[f'D{r_idx}'].number_format = formato_fecha_elegante
         ws[f'D{r_idx}'].alignment = Alignment(horizontal="left")
         
         if pago_str == "Capital":
-            ws[f'E{r_idx}'] = "" # Plazo
+            ws[f'E{r_idx}'] = "" # Plazo vacío para el capital
             ws[f'F{r_idx}'] = "=$I$9" 
             ws[f'F{r_idx}'].alignment = Alignment(horizontal="center")
             ws[f'G{r_idx}'] = "" # Cupón
@@ -407,10 +407,16 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
             ws[f'I{r_idx}'].number_format = '#,##0.00'
         else:
             # Columna E: Plazo
-            if r_idx == fila_inicio:
-                ws[f'E{r_idx}'] = f"=D{r_idx}-I12" 
+            if para_pdf:
+                # 🚨 PDF: Inyectamos el número estático del DataFrame (row_data[2] es el plazo)
+                # Así LibreOffice no evalúa ninguna resta y evitamos el #VALUE!
+                ws[f'E{r_idx}'] = row_data[2] 
             else:
-                ws[f'E{r_idx}'] = f"=D{r_idx}-D{r_idx-1}" 
+                # 🚨 EXCEL: Mantenemos la fórmula dinámica para que la hoja sea operable
+                if r_idx == fila_inicio:
+                    ws[f'E{r_idx}'] = f"=D{r_idx}-I12" 
+                else:
+                    ws[f'E{r_idx}'] = f"=D{r_idx}-D{r_idx-1}" 
             ws[f'E{r_idx}'].number_format = '0'
             ws[f'E{r_idx}'].alignment = Alignment(horizontal="center")
             
