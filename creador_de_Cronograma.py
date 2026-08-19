@@ -287,7 +287,7 @@ total_neto = df["Neto a pagar"].sum()
 st.success(f"**MONTO A RECIBIR: {moneda} {total_neto:,.2f}**")
 
 # --- 5. EXPORTACIÓN A EXCEL (PLANTILLA CORPORATIVA ENMARCADA) ---
-def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, ir, titulo_crono, tipo_doc, num_doc, tipo_tasa):
+def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, ir, titulo_crono, tipo_doc, num_doc, tipo_tasa, para_pdf=False):
     wb = Workbook()
     ws = wb.active
     ws.title = "Cronograma"
@@ -333,16 +333,23 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
         ws.cell(row=7+i, column=3, value=et)
         celda_valor = ws.cell(row=7+i, column=9)
         
-        # Inyectamos formatos y fórmulas en la cabecera
+        # Inyectamos formatos y fórmulas en la cabecera (Línea 174 aprox)
         if et == "Fecha de Inversión":
-            # 🚨 Envolvemos el valor (val) en fecha_a_espanol() para forzar el texto
-            celda_valor.value = fecha_a_espanol(val)
+            if para_pdf:
+                celda_valor.value = fecha_a_espanol(val)
+            else:
+                celda_valor.value = val
+                celda_valor.number_format = 'dd/mm/yyyy' # Formato Fecha Corta
             celda_valor.alignment = Alignment(horizontal="right")
+            
         elif et == "Fecha de Redención":
-            # 🚨 Al ser texto, ya no podemos sumar días en Excel "=I12+I8". 
-            # Le pasamos la fecha final directamente procesada por Python.
-            celda_valor.value = fecha_a_espanol(f_red) 
+            if para_pdf:
+                celda_valor.value = fecha_a_espanol(f_red)
+            else:
+                celda_valor.value = "=I12+I8"
+                celda_valor.number_format = 'dd/mm/yyyy' # Formato Fecha Corta
             celda_valor.alignment = Alignment(horizontal="right")
+            
         else:
             celda_valor.value = val
             celda_valor.alignment = Alignment(horizontal="right")
@@ -382,9 +389,12 @@ def generar_excel_bam(df, inv, plazo_d, moneda, monto, tna, f_emi, f_red, frec, 
         ws[f'C{r_idx}'] = pago_str
         ws[f'C{r_idx}'].alignment = Alignment(horizontal="left")
         
-        # Columna D: Fecha de vencimiento (Formato elegante)
-        ws[f'D{r_idx}'] = fecha_vencimiento
-        ws[f'D{r_idx}'].number_format = formato_fecha_elegante
+        # Columna D: Fecha de vencimiento (Línea 218 aprox)
+        if para_pdf:
+            ws[f'D{r_idx}'] = fecha_a_espanol(fecha_vencimiento)
+        else:
+            ws[f'D{r_idx}'] = fecha_vencimiento
+            ws[f'D{r_idx}'].number_format = 'dd/mm/yyyy' # Formato Fecha Corta
         ws[f'D{r_idx}'].alignment = Alignment(horizontal="left")
         
         if pago_str == "Capital":
@@ -568,22 +578,20 @@ nombre_archivo_limpio = complemento_archivo.replace(' ', '_').replace('/', '-')
 nombre_archivo_excel = f"CRONO-{codigo_serie}-{Letra_serie}-{nombre_archivo_limpio}.xlsx"
 nombre_archivo_pdf = f"CRONO-{codigo_serie}-{Letra_serie}-{nombre_archivo_limpio}.pdf"
 
-# === NUEVA LÓGICA DE TÍTULO DINÁMICO ===
 if emision and "No aplica" not in emision:
     titulo_cronograma = f"CRONOGRAMA: {programa} - {emision}"
 else:
     titulo_cronograma = f"CRONOGRAMA: {programa}"
 
-# 1. Generamos el Excel base (siempre se necesita, ya sea para descargar o como molde del PDF)
-excel_file = generar_excel_bam(df, inversionista, plazo_total_dias, moneda, monto, tna, fecha_emision, fecha_redencion, frecuencia, tasa_ir, 
-    titulo_cronograma, tipo_documento, numero_documento, tipo_tasa) # <-- ¡Añadido al final!
+# 1. GENERAMOS EL EXCEL OPERATIVO (Fechas nativas, formato corto, fórmulas intactas)
+excel_file_descarga = generar_excel_bam(df, inversionista, plazo_total_dias, moneda, monto, tna, fecha_emision, fecha_redencion, frecuencia, tasa_ir, titulo_cronograma, tipo_documento, numero_documento, tipo_tasa, para_pdf=False)
 
 col_btn1, col_btn2 = st.columns(2)
 
 with col_btn1:
     st.download_button(
         label="📥 Descargar Cronograma (Excel)",
-        data=excel_file,
+        data=excel_file_descarga, # Usamos la versión operativa
         file_name=nombre_archivo_excel,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True 
@@ -591,9 +599,11 @@ with col_btn1:
 
 with col_btn2:
     if escoger_pdf == "SÍ":
-        # NUEVA LÓGICA: Le pasamos el Excel ya diseñado al generador de PDF
         with st.spinner('Ensamblando PDF corporativo...'):
-            pdf_file = generar_pdf_desde_excel(excel_file)
+            # 2. GENERAMOS EL EXCEL ESTÉTICO (Solo texto, exclusivo para que el PDF no se rompa)
+            excel_file_pdf = generar_excel_bam(df, inversionista, plazo_total_dias, moneda, monto, tna, fecha_emision, fecha_redencion, frecuencia, tasa_ir, titulo_cronograma, tipo_documento, numero_documento, tipo_tasa, para_pdf=True)
+            
+            pdf_file = generar_pdf_desde_excel(excel_file_pdf) # Compilamos el PDF usando el clon de texto
             
         if pdf_file:
             st.download_button(
@@ -612,7 +622,6 @@ with col_btn2:
             data=b"", 
             file_name="vacio.pdf",
             disabled=True,
-            help="Selecciona 'SÍ' en la barra lateral (Creación de PDF) para habilitar esta descarga.",
+            help="Selecciona 'SÍ' en la barra lateral para habilitar esta descarga.",
             use_container_width=True
         )
-    
