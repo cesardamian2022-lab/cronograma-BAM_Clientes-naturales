@@ -190,7 +190,8 @@ else:
     fecha_siguiente = calcular_primer_25(fecha_emision, frecuencia, map_frecuencia)
     meses_salto = map_frecuencia[frecuencia]["meses"]
 
-    # El bucle while calculará los cupones intermedios (si los hay)
+    
+# El bucle while calculará los cupones intermedios (si los hay)
 while fecha_siguiente < fecha_redencion:
     dias_periodo = (fecha_siguiente - fecha_anterior).days
     
@@ -216,9 +217,15 @@ while fecha_siguiente < fecha_redencion:
     fecha_anterior = fecha_siguiente
     fecha_siguiente = fecha_siguiente + relativedelta(months=meses_salto)
 
-    dias_ultimo_periodo = (fecha_redencion - fecha_anterior).days
-    if dias_ultimo_periodo > 0:
-        cupon_bruto = monto * tasa_input if tipo_tasa == "Al Vencimiento" else monto * (tna / 360) * dias_ultimo_periodo
+dias_ultimo_periodo = (fecha_redencion - fecha_anterior).days
+
+if dias_ultimo_periodo > 0:
+    # Lógica expandida para mayor claridad financiera
+    if tipo_tasa == "Al Vencimiento":
+        cupon_bruto = monto * tasa_input
+    else:
+        cupon_bruto = monto * (tna / 360) * dias_ultimo_periodo
+        
     retencion = cupon_bruto * tasa_ir
     neto = cupon_bruto - retencion
     
@@ -232,7 +239,7 @@ while fecha_siguiente < fecha_redencion:
         "Neto a pagar": neto
     })
 
-# Fila Final del Capital
+# Fila Final del Capital (También fuera del bucle)
 cronograma.append({
     "Pago": "Capital",
     "Fecha de vencimiento": fecha_redencion,
@@ -244,6 +251,7 @@ cronograma.append({
 })
 
 df = pd.DataFrame(cronograma)
+
 
 # --- 4. RENDERIZADO VISUAL EN LA WEB ---
 st.write(f"### Cotización a Inversionista: {inversionista}")
